@@ -15,8 +15,7 @@ HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SHIVAM HACKER // NUMBER TRACKER</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 <style>
 
@@ -271,6 +270,43 @@ input::placeholder { color: rgba(0,255,65,0.3); letter-spacing:3px; }
 }
 .toast.show { opacity: 1; }
 
+/* ── LOADER ── */
+#loader {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(3,15,3,0.93);
+  z-index: 99999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+.loader-ring {
+  width: 64px; height: 64px;
+  border: 3px solid rgba(0,255,65,0.15);
+  border-top: 3px solid var(--g);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  box-shadow: 0 0 18px var(--g);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loader-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: var(--g);
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px var(--g);
+}
+.loader-status {
+  font-size: 11px;
+  color: var(--gdim);
+  letter-spacing: 3px;
+  opacity: 0.7;
+}
+
 /* ── FOOTER ── */
 .ftr {
   text-align: center;
@@ -306,9 +342,9 @@ input::placeholder { color: rgba(0,255,65,0.3); letter-spacing:3px; }
   <!-- INPUT CARD -->
   <div class="card">
     <div class="card-lbl">TARGET NUMBER INPUT</div>
-    <form method="POST">
+    <form method="POST" id="trackForm">
       <input type="text" name="number" placeholder="ENTER MOBILE NUMBER" required autocomplete="off" id="numInput">
-      <button type="submit" class="btn-track">⚡ TRACK NOW ⚡</button>
+      <button type="submit" class="btn-track" id="trackBtn" onclick="showLoader()">&#x26A1; TRACK NOW &#x26A1;</button>
     </form>
   </div>
 
@@ -366,14 +402,48 @@ input::placeholder { color: rgba(0,255,65,0.3); letter-spacing:3px; }
 
     {% if data.aadhaar and data.aadhaar != 'N/A' %}
     <div class="row">
-      <span class="row-lbl">🪪 AADHAAR</span>
+      <span class="row-lbl">🪦 AADHAAR</span>
       <span class="row-val aadhaar-val">{{ data.aadhaar }}</span>
     </div>
     {% endif %}
 
-    <div id="map"></div>
-    <div id="dist-lbl"></div>
+    {% if data.address and data.address != 'N/A' %}
+    <div style="margin-top:18px;">
+      <div style="font-size:10px; letter-spacing:3px; color:rgba(0,255,65,0.5); margin-bottom:8px;">// GOOGLE MAP LOCATION</div>
+      <iframe
+        id="gmap"
+        src="https://maps.google.com/maps?q={{ data.address | urlencode }}&output=embed&z=14"
+        width="100%%"
+        height="280"
+        style="border:1px solid rgba(0,255,65,0.3); border-radius:8px; display:block; box-shadow:0 0 18px rgba(0,255,65,0.08);"
+        allowfullscreen
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+      <a href="https://www.google.com/maps/search/?api=1&query={{ data.address | urlencode }}"
+         target="_blank"
+         style="display:inline-block; margin-top:10px; padding:9px 20px; background:rgba(0,255,65,0.08); border:1px solid rgba(0,255,65,0.4); border-radius:6px; color:var(--g); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-decoration:none;">
+        &#x1F30D; FULL GOOGLE MAPS M DEKHO
+      </a>
+    </div>
+    {% endif %}
 
+  </div>
+  {% endif %}
+
+  <!-- NOT FOUND CARD -->
+  {% if searched and not data %}
+  <div class="card" style="text-align:center; padding:40px 24px;">
+    <div style="font-size:52px; margin-bottom:16px; animation:blink 1.5s infinite;">&#x1F914;</div>
+    <div style="font-family:'Orbitron',sans-serif; font-size:18px; color:#ffaa00; letter-spacing:3px; text-shadow:0 0 12px #ffaa00; margin-bottom:16px;">MAAF KIJIYE</div>
+    <div style="border-top:1px solid rgba(0,255,65,0.15); padding-top:16px; font-size:13px; color:rgba(200,255,212,0.65); letter-spacing:2px; line-height:2.2;">
+      <span style="color:#ffaa00;">&#x26A0;</span> Is number ki koi jankari<br>
+      hamare server mein available nahi hai.<br><br>
+      <span style="font-size:11px; color:rgba(0,255,65,0.4);">[ Number registered nahi hai ya data nahi mila ]</span>
+    </div>
+    <div style="margin-top:20px;">
+      <button onclick="window.location.href='/'" style="padding:10px 28px; background:rgba(255,170,0,0.12); border:1px solid #ffaa00; border-radius:6px; color:#ffaa00; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:3px; cursor:pointer;">&#x21BA; DOBARA TRY KARO</button>
+    </div>
   </div>
   {% endif %}
 
@@ -384,10 +454,64 @@ input::placeholder { color: rgba(0,255,65,0.3); letter-spacing:3px; }
 
 </div><!-- /wrap -->
 
+<!-- LOADER OVERLAY (outside wrap) -->
+<div id="loader">
+  <div class="loader-ring"></div>
+  <div class="loader-text">TRACKING TARGET<span id="ldots">...</span></div>
+  <div class="loader-status" id="loaderStatus">[*] CONNECTING TO DATABASE...</div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast">✅ DATA COPIED!</div>
 
 <script>
+// ── VOICE (Web Speech API) ───────────────────────────
+function speak(text, lang){
+  if(!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = lang || 'hi-IN';
+  u.rate = 0.92;
+  u.pitch = 1;
+  window.speechSynthesis.speak(u);
+}
+
+// Auto-speak on page load based on result
+window.addEventListener('load', function(){
+  {% if data and data.name != 'N/A' %}
+    speak('Target ki jankari mil gayi. Data screen par show ho raha hai.');
+  {% elif searched %}
+    speak('Khed hai. Hamare server mein is number ka koi data nahi mila.');
+  {% endif %}
+});
+
+// ── LOADER ───────────────────────────────────────────
+var loaderMsgs = [
+  '[*] CONNECTING TO DATABASE...',
+  '[*] BYPASSING FIREWALL...',
+  '[*] LOCATING TARGET...',
+  '[*] EXTRACTING RECORDS...',
+  '[*] DECRYPTING DATA...'
+];
+function showLoader(){
+  var numVal = document.getElementById('numInput').value.trim();
+  if(!numVal) return;
+  // Voice: bolo ki search shuru ho raha hai (number mat bolo)
+  speak('Number ki jankari nikali ja rahi hai. Kripya prateeksha karein.');
+  document.getElementById('loader').style.display = 'flex';
+  var si = 0;
+  var dotStr = ['.','..','...'];
+  var di = 0;
+  setInterval(function(){
+    document.getElementById('loaderStatus').textContent = loaderMsgs[si % loaderMsgs.length];
+    si++;
+  }, 900);
+  setInterval(function(){
+    document.getElementById('ldots').textContent = dotStr[di % 3];
+    di++;
+  }, 400);
+}
+
 // ── MATRIX RAIN ──────────────────────────────────────
 const cv = document.getElementById('mc');
 const cx = cv.getContext('2d');
@@ -447,84 +571,66 @@ function showToast(){
   setTimeout(()=>t.classList.remove('show'),2200);
 }
 
-// ── MAP ──────────────────────────────────────────────
-{% if data %}
-const mapEl = document.getElementById('map');
-if(mapEl){
-  const map = L.map('map').setView([20.59,78.96],5);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:''}).addTo(map);
-  const addr = document.getElementById('addrVal')?.innerText;
-  if(addr && addr !== 'N/A'){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const uLat=pos.coords.latitude, uLng=pos.coords.longitude;
-      const youIcon=L.divIcon({html:'<div style="font-size:20px">📍</div>',className:''});
-      L.marker([uLat,uLng],{icon:youIcon}).addTo(map).bindPopup('<b>YOU</b>');
-      fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr))
-      .then(r=>r.json()).then(d=>{
-        if(d.length>0){
-          const tLat=parseFloat(d[0].lat), tLng=parseFloat(d[0].lon);
-          const tgtIcon=L.divIcon({html:'<div style="font-size:20px">☠</div>',className:''});
-          L.marker([tLat,tLng],{icon:tgtIcon}).addTo(map).bindPopup('<b>TARGET</b>');
-          L.polyline([[uLat,uLng],[tLat,tLng]],{color:'#00ff41',weight:2,dashArray:'6 6'}).addTo(map);
-          map.fitBounds([[uLat,uLng],[tLat,tLng]],{padding:[30,30]});
-          const R=6371,dLat=(tLat-uLat)*Math.PI/180,dLon=(tLng-uLng)*Math.PI/180;
-          const a=Math.sin(dLat/2)**2+Math.cos(uLat*Math.PI/180)*Math.cos(tLat*Math.PI/180)*Math.sin(dLon/2)**2;
-          const km=(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(1);
-          document.getElementById('dist-lbl').innerHTML='📏 Distance from you: <b>'+km+' KM</b>';
-        }
-      });
-    }, ()=>{
-      // no geolocation - just show target
-      fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr))
-      .then(r=>r.json()).then(d=>{
-        if(d.length>0){
-          const tLat=parseFloat(d[0].lat), tLng=parseFloat(d[0].lon);
-          map.setView([tLat,tLng],10);
-          L.marker([tLat,tLng]).addTo(map).bindPopup('<b>TARGET LOCATION</b>').openPopup();
-        }
-      });
-    });
-  }
-}
-{% endif %}
+// ── Google Maps iframe loaded via HTML (no JS needed) ─
 </script>
 
 </body>
 </html>
 """
 
-# ===== API =====
+# ===== API ===== (2 retries)
+import time
+
 def fetch_data(number):
-    try:
-        url = f"https://exploitsindia.site/track/live.php?term={number}"
-        res = requests.get(url, timeout=15)
-        text = res.content.decode("utf-8", errors="replace")
+    url = f"https://exploitsindia.site/track/live.php?term={number}"
 
-        def get(pattern):
-            m = re.search(pattern, text, re.IGNORECASE)
-            return m.group(1).strip() if m else "N/A"
+    for attempt in range(2):          # try 2 times
+        try:
+            res = requests.get(url, timeout=15)
+            text = res.content.decode("utf-8", errors="replace")
 
-        return {
-            "name":    get(r"Name:\s*(.+)"),
-            "fname":   get(r"Father\s*Name:\s*(.+)"),
-            "mobile":  get(r"Mobile:\s*(.+)") or number,
-            "alt":     get(r"Alternate:\s*(.+)"),
-            "circle":  get(r"Circle:\s*(.+)"),
-            "email":   get(r"Email:\s*(.+)"),
-            "address": get(r"Address:\s*(.+)"),
-            "aadhaar": get(r"Aadhaar:\s*(.+)"),
-        }
+            def get(pattern):
+                m = re.search(pattern, text, re.IGNORECASE)
+                return m.group(1).strip() if m else "N/A"
 
-    except:
-        return None
+            name = get(r"Name:\s*(.+)")
+
+            # Agar name N/A hai aur pehla attempt hai → retry
+            if name == "N/A" and attempt == 0:
+                time.sleep(1)
+                continue
+
+            # Dono try ke baad bhi N/A → data nahi mila
+            if name == "N/A":
+                return None
+
+            return {
+                "name":    name,
+                "fname":   get(r"Father\s*Name:\s*(.+)"),
+                "mobile":  get(r"Mobile:\s*(.+)") or number,
+                "alt":     get(r"Alternate:\s*(.+)"),
+                "circle":  get(r"Circle:\s*(.+)"),
+                "email":   get(r"Email:\s*(.+)"),
+                "address": get(r"Address:\s*(.+)"),
+                "aadhaar": get(r"Aadhaar:\s*(.+)"),
+            }
+        except Exception:
+            if attempt == 0:
+                time.sleep(1)   # 1 second wait then retry
+            else:
+                return None
+    return None
 
 @app.route("/", methods=["GET","POST"])
 def home():
     data = None
+    searched = False
     if request.method == "POST":
-        number = request.form.get("number")
-        data = fetch_data(number)
-    return render_template_string(HTML, data=data)
+        number = request.form.get("number", "").strip()
+        searched = True
+        if number:
+            data = fetch_data(number)
+    return render_template_string(HTML, data=data, searched=searched)
 
 if __name__ == "__main__":
     try:
