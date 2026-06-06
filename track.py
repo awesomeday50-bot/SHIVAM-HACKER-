@@ -407,12 +407,12 @@ input::placeholder { color: rgba(0,255,65,0.3); letter-spacing:3px; }
     </div>
     {% endif %}
 
-    {% if data.address and data.address != 'N/A' %}
+    {% if data.address and data.address != 'N/A' and map_query %}
     <div style="margin-top:18px;">
       <div style="font-size:10px; letter-spacing:3px; color:rgba(0,255,65,0.5); margin-bottom:8px;">// GOOGLE MAP LOCATION</div>
       <iframe
         id="gmap"
-        src="https://maps.google.com/maps?q={{ data.address | urlencode }}&output=embed&z=14"
+        src="https://maps.google.com/maps?q={{ map_query | urlencode }}&output=embed&z=14"
         width="100%%"
         height="280"
         style="border:1px solid rgba(0,255,65,0.3); border-radius:8px; display:block; box-shadow:0 0 18px rgba(0,255,65,0.08);"
@@ -420,7 +420,7 @@ input::placeholder { color: rgba(0,255,65,0.3); letter-spacing:3px; }
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade">
       </iframe>
-      <a href="https://www.google.com/maps/search/?api=1&query={{ data.address | urlencode }}"
+      <a href="https://www.google.com/maps/search/?api=1&query={{ map_query | urlencode }}"
          target="_blank"
          style="display:inline-block; margin-top:10px; padding:9px 20px; background:rgba(0,255,65,0.08); border:1px solid rgba(0,255,65,0.4); border-radius:6px; color:var(--g); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-decoration:none;">
         &#x1F30D; FULL GOOGLE MAPS M DEKHO
@@ -621,16 +621,58 @@ def fetch_data(number):
                 return None
     return None
 
+# ===== ADDRESS CLEANER FOR GOOGLE MAPS =====
+def clean_map_query(address):
+    """Extract precise location from messy Indian addresses for Google Maps."""
+    if not address or address == 'N/A':
+        return None
+
+    # Step 1: Extract 6-digit PIN code
+    pin_match = re.search(r'\b(\d{6})\b', address)
+    pincode = pin_match.group(1) if pin_match else ''
+
+    # Step 2: Remove leading house/flat/ward numbers and noise
+    # e.g. "06 ward no. 06 " or "H.No. 123 " or "Flat 4B "
+    clean = re.sub(
+        r'^[\d\s/,.-]+'
+        r'|\bward\s*no\.?\s*\d*\b'
+        r'|\bh\.?\s*no\.?\s*[\d/a-z]*\b'
+        r'|\bflat\s*[\d/a-z]*\b'
+        r'|\bplot\s*[\d/a-z]*\b',
+        ' ', address, flags=re.IGNORECASE
+    )
+
+    # Step 3: Remove admin noise words but keep place names
+    clean = re.sub(
+        r'\bP\.?O\.?\b|\btehseel\b|\btahsil\b|\btehsil\b'
+        r'|\bdist\.?\b|\bvill\.?\b|\bpo\b',
+        ' ', clean, flags=re.IGNORECASE
+    )
+
+    # Step 4: Collapse whitespace and strip
+    clean = re.sub(r'\s+', ' ', clean).strip().strip(',').strip()
+
+    # Step 5: Build final query: cleaned_address + pincode (deduplicated)
+    if pincode and pincode not in clean:
+        query = f"{clean} {pincode} India"
+    else:
+        query = f"{clean} India"
+
+    return query
+
 @app.route("/", methods=["GET","POST"])
 def home():
     data = None
     searched = False
+    map_query = None
     if request.method == "POST":
         number = request.form.get("number", "").strip()
         searched = True
         if number:
             data = fetch_data(number)
-    return render_template_string(HTML, data=data, searched=searched)
+            if data and data.get('address') and data['address'] != 'N/A':
+                map_query = clean_map_query(data['address'])
+    return render_template_string(HTML, data=data, searched=searched, map_query=map_query)
 
 if __name__ == "__main__":
     try:
